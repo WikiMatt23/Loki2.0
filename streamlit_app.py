@@ -4,26 +4,20 @@ import mimetypes
 import tiktoken
 import uuid
 import logging
+import time
 
 logging.basicConfig(level=logging.DEBUG)
 
 # --- MODEL PRICING PER 1K TOKENS ---
 MODEL_PRICING = {
-    # GPT-4 family
     "gpt-4o": {"input": 0.005, "output": 0.015},
     "gpt-4o-mini": {"input": 0.005, "output": 0.015},
     "gpt-4-turbo": {"input": 0.0015, "output": 0.003},
     "gpt-4": {"input": 0.03, "output": 0.06},
-
-    # GPT-3.5 family
     "gpt-3.5-turbo": {"input": 0.0004, "output": 0.0004},
     "gpt-3.5-turbo-16k": {"input": 0.0006, "output": 0.0006},
-
-    # GPT-4 with extended context
     "gpt-4-32k": {"input": 0.06, "output": 0.12},
     "gpt-4-32k-turbo": {"input": 0.003, "output": 0.006},
-
-    # Other common models (if used)
     "text-davinci-003": {"input": 0.02, "output": 0.02},
     "text-curie-001": {"input": 0.002, "output": 0.002},
 }
@@ -79,7 +73,6 @@ if not all_models:
     st.error("No GPT models found for your API key.")
     st.stop()
 
-# Show debug info for available models
 logging.debug(f"Available GPT models: {all_models}")
 
 default_models = ["gpt-4o-mini", "gpt-3.5-turbo"]
@@ -162,15 +155,14 @@ if prompt := st.chat_input("Type your message..."):
             elif file_type == "application/pdf":
                 file_descriptions.append(f"📄 PDF uploaded: {file.name}")
             elif file_type and file_type.startswith("text/"):
-                # Safe file read with try-except
                 try:
                     text = file.read().decode("utf-8", errors="ignore")
                     file_descriptions.append(f"📄 Text file ({file.name}):\n{text[:1000]}...")
-                except Exception as e:
+                except Exception:
                     file_descriptions.append(f"📄 Text file ({file.name}): Unable to read content.")
             else:
                 file_descriptions.append(f"📁 File uploaded: {file.name}")
-        except Exception as e:
+        except Exception:
             file_descriptions.append(f"📁 File uploaded: {file.name} (error inspecting type)")
         finally:
             try:
@@ -197,13 +189,11 @@ if prompt := st.chat_input("Type your message..."):
         message_placeholder = st.empty()
         with st.chat_message("assistant"):
             for chunk in stream:
-                delta = ""
-                try:
-                    delta = chunk.choices[0].delta.get("content", "")
-                except Exception:
-                    delta = getattr(chunk.choices[0].delta, "content", "") or ""
+                delta = chunk.choices[0].delta.get("content", "")
                 full_response += delta
                 message_placeholder.markdown(full_response)
+                # Tiny sleep to help Streamlit render intermediate chunks smoothly
+                time.sleep(0.01)
 
         output_tokens = count_tokens(full_response, model_name)
         output_cost = (output_tokens / 1000) * model_cost["output"]
