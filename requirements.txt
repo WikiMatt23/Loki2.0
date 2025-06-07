@@ -1,0 +1,6 @@
+streamlit
+openai
+tiktoken
+uuid
+mimetypes
+logging
